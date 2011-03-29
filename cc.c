@@ -13,24 +13,23 @@
 Uso: cc -n <serial> -s <servidor> \
 -p <puerto servidor> -c <archivo configuracion>\n");
 
+FILE *conf_file = NULL;
 struct termios oldsioc, newsioc;
 
 int serial_open(char *serial_name);
 int serial_close(int fd);
 int serial_read(int fd);
 void sigint_handler(int sign);
-
 int main(int argc, char *argv[])
 {
 	char *serial_name = NULL;
 	char *udp_server = NULL;
 	char *server_port = NULL;
-	char *config_file = cc.conf;
-	
+	char *conf_file_name = "cc.conf";
+    char conf_line[50];
+
 	int sfd, tmp;
 	
-	FILE *conf_file = NULL;
-
 	if (argc < 5) { 
 		PRINT_HELP
 		exit(EXIT_FAILURE);
@@ -48,7 +47,7 @@ int main(int argc, char *argv[])
 				server_port = optarg;
 				break;
 			case 'c':
-				config_file = optarg;
+				conf_file_name = optarg;
 				break;
 			default:
 				PRINT_HELP;
@@ -60,20 +59,21 @@ int main(int argc, char *argv[])
 	printf("Serial Name = %s \n", serial_name);
 	printf("UDP Server = %s\n", udp_server);
 	printf("Server Port = %s\n", server_port);
-	
+	printf("Config file = %s\n", conf_file_name);
+
 	if (signal(SIGINT, sigint_handler) == SIG_ERR)
   		error(0, errno, "ERROR: Cannot set signal handler");
 	
-	if ((conf_file = fopen("config", "r")) == NULL)
-		error(-1, errno, "Cannot open config file %s\n", config_file);
+	if ((conf_file = fopen(conf_file_name, "r")) == NULL)
+		error(-1, errno, "Cannot open config file %s", conf_file_name);
 	
 	while(!feof(conf_file)) {
-		
+		fgets(conf_line, 50, conf_file);
+		printf(conf_line);
 	}
 
-
 	if (fclose(conf_file) == EOF)
-		error(0, errno, "ERROR: Cannot close config file %s\n", conf_file);
+		error(0, errno, "ERROR: Cannot close config file %s", conf_file_name);
 	
 	/*
 	if ((sfd = serial_open(serial_name)) == -1);
@@ -93,7 +93,7 @@ int serial_open(char *serial_name)
 	}
 	
 	if (tcgetattr(fd, &oldsioc) == -1) {
-		error(0, errno, "ERROR: Cannot get terminal attributes")
+		error(0, errno, "ERROR: Cannot get terminal attributes");
 		return -1;
 	}
 
