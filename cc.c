@@ -13,20 +13,20 @@
 Uso: cc -n <serial> -s <servidor> \
 -p <puerto servidor> -c <archivo configuracion>\n");
 
-FILE *conf_file = NULL;
 struct termios oldsioc, newsioc;
 
 int serial_open(char *serial_name);
 int serial_close(int fd);
-int serial_read(int fd);
+void get_conf(char *file_name);
+
 void sigint_handler(int sign);
+
 int main(int argc, char *argv[])
 {
 	char *serial_name = NULL;
 	char *udp_server = NULL;
 	char *server_port = NULL;
-	char *conf_file_name = "cc.conf";
-    char conf_line[50];
+	char *conf_file_name = "conf";
 
 	int sfd, tmp;
 	
@@ -56,28 +56,11 @@ int main(int argc, char *argv[])
 		}
 	}
 	
-	printf("Serial Name = %s \n", serial_name);
-	printf("UDP Server = %s\n", udp_server);
-	printf("Server Port = %s\n", server_port);
-	printf("Config file = %s\n", conf_file_name);
-
 	if (signal(SIGINT, sigint_handler) == SIG_ERR)
   		error(0, errno, "ERROR: Cannot set signal handler");
+		
+	get_conf(conf_file_name);
 	
-	if ((conf_file = fopen(conf_file_name, "r")) == NULL)
-		error(-1, errno, "Cannot open config file %s", conf_file_name);
-	
-	while(fgets(conf_line, 50, conf_file) != NULL) {
-		printf(conf_line);
-	}
-
-	if (fclose(conf_file) == EOF)
-		error(0, errno, "ERROR: Cannot close config file %s", conf_file_name);
-	
-	/*
-	if ((sfd = serial_open(serial_name)) == -1);
-		exit(EXIT_FAILURE);
-	*/
 	
 	return 0;
 }
@@ -86,15 +69,11 @@ int serial_open(char *serial_name)
 {
 	int fd;
 	
-	if ((fd = open(serial_name, O_NOCTTY | O_RDWR)) == -1) {
-		error(0, errno, "ERROR: Cannot open %s", serial_name);
-		return fd;
-	}
+	if ((fd = open(serial_name, O_NOCTTY | O_RDWR)) == -1)
+		error(EXIT_FAILURE, errno, "ERROR: Cannot open %s", serial_name);
 	
-	if (tcgetattr(fd, &oldsioc) == -1) {
-		error(0, errno, "ERROR: Cannot get terminal attributes");
-		return -1;
-	}
+	if (tcgetattr(fd, &oldsioc) == -1)
+		error(EXIT_FAILURE, errno, "ERROR: Cannot get terminal attributes");
 
 	newsioc.c_iflag = 0;
 	newsioc.c_oflag = 0;
@@ -107,11 +86,9 @@ int serial_open(char *serial_name)
 
 	tcflush(fd, TCIOFLUSH);
 
-	if (tcsetattr(fd, TCSANOW, &newsioc) == -1) {
-		error(0, errno, "ERROR: Cannot set terminal atributes");
-		return -1;
-	}
-
+	if (tcsetattr(fd, TCSANOW, &newsioc) == -1)
+		error(EXIT_FAILURE, errno, "ERROR: Cannot set terminal atributes");
+	
 	return fd;
 }
 
@@ -132,4 +109,20 @@ void sigint_handler(int sign)
 {
 	printf("\nQuit? Try again\n");
 	signal(SIGINT, SIG_DFL);
+}
+
+void get_conf(char *file_name)
+{
+	FILE *file = NULL;
+	char line[50];
+
+	if ((file = fopen(file_name, "r")) == NULL)
+		error(EXIT_FAILURE, errno, "Cannot open config file %s", file_name);
+	
+	while(fgets(line, 50, file) != NULL) {
+		printf(line);
+	}
+
+	if (fclose(file) == EOF)
+		error(0, errno, "ERROR: Cannot close config file %s", file_name);
 }
