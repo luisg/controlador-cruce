@@ -67,8 +67,7 @@ int main(int argc, char *argv[])
 	if ((conf_file = fopen(conf_file_name, "r")) == NULL)
 		error(-1, errno, "Cannot open config file %s", conf_file_name);
 	
-	while(!feof(conf_file)) {
-		fgets(conf_line, 50, conf_file);
+	while(fgets(conf_line, 50, conf_file) != NULL) {
 		printf(conf_line);
 	}
 
