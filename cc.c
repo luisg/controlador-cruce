@@ -28,13 +28,15 @@ int main(int argc, char *argv[])
 	char *server_port = NULL;
 	char *conf_file_name = "conf";
 
-	int sfd, tmp;
-	
+	int s_fd, tmp;
+
+	/*	
 	if (argc < 5) { 
 		PRINT_HELP
 		exit(EXIT_FAILURE);
 	}
-	
+	*/
+
 	while ((tmp = getopt(argc, argv, "n:s:p:c:")) != -1) {
 		switch (tmp) {
 			case 'n':
@@ -60,8 +62,7 @@ int main(int argc, char *argv[])
   		error(0, errno, "ERROR: Cannot set signal handler");
 		
 	get_conf(conf_file_name);
-	
-	
+		
 	return 0;
 }
 
@@ -120,7 +121,8 @@ void get_conf(char *file_name)
 		error(EXIT_FAILURE, errno, "Cannot open config file %s", file_name);
 	
 	while(fgets(line, 50, file) != NULL) {
-		printf(line);
+		if (line[0] != '\n')
+			printf("%s", line);
 	}
 
 	if (fclose(file) == EOF)
