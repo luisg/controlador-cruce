@@ -18,7 +18,6 @@ struct termios oldsioc, newsioc;
 int serial_open(char *serial_name);
 int serial_close(int fd);
 void get_conf(char *file_name);
-
 void sigint_handler(int sign);
 
 int main(int argc, char *argv[])
@@ -28,7 +27,7 @@ int main(int argc, char *argv[])
 	char *server_port = NULL;
 	char *conf_file_name = "conf";
 
-	int s_fd, tmp;
+	int s_fd;
 
 	/*	
 	if (argc < 5) { 
@@ -60,8 +59,7 @@ int main(int argc, char *argv[])
 	
 	if (signal(SIGINT, sigint_handler) == SIG_ERR)
   		error(0, errno, "ERROR: Cannot set signal handler");
-		
-	get_conf(conf_file_name);
+
 		
 	return 0;
 }
@@ -71,7 +69,7 @@ int serial_open(char *serial_name)
 	int fd;
 	
 	if ((fd = open(serial_name, O_NOCTTY | O_RDWR)) == -1)
-		error(EXIT_FAILURE, errno, "ERROR: Cannot open %s", serial_name);
+		error(EXIT_FAILURE, errno, "ERROR: Cannot open %s ", serial_name);
 	
 	if (tcgetattr(fd, &oldsioc) == -1)
 		error(EXIT_FAILURE, errno, "ERROR: Cannot get terminal attributes");
