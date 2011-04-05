@@ -8,28 +8,41 @@
 #include <termios.h>
 #include <fcntl.h>
 #include <signal.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 
 #define PRINT_HELP printf("CC Controlador de Cruce\n\
 Uso: cc -n <serial> -s <servidor> \
 -p <puerto servidor> -c <archivo configuracion>\n");
 
+char *serial_name = "/dev/ttyS0";
+char *tcp_server = "127.0.0.1";
+char *server_port = "2000";
+char *conf_file_name = "conf";
+
 struct termios oldsioc, newsioc;
 
-int serial_open(char *serial_name);
+int serial_open();
 int serial_close(int fd);
-void get_conf(char *file_name);
+void get_conf();
 void sigint_handler(int sign);
-void tcp_server(void);
-void tcp_client(void);
 
 int main(int argc, char *argv[])
 {
-	char *serial_name = NULL;
-	char *udp_server = NULL;
-	char *server_port = NULL;
-	char *conf_file_name = "conf";
-
+	int tmp;
 	int s_fd;
+	int sockfd;
+	struct sockaddr_in s_addr;
+		
+	if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1)
+		error(EXIT_FAILURE, errno, "Cannot open socket");
+	
+	s_addr.sin_family = AF_INET;
+	s_addr.sin_port = htons(server_port);
+	s_addr.sin_addr.s_addr = inet_addr(tcp_server);
+	memset(&s_addr, 0, sizeof(s_addr));
+	
 
 	/*	
 	if (argc < 5) { 
@@ -44,7 +57,7 @@ int main(int argc, char *argv[])
 				serial_name = optarg;
 				break;
 			case 's':
-				udp_server = optarg;
+				tcp_server = optarg;
 				break;
 			case 'p':
 				server_port = optarg;
@@ -66,7 +79,7 @@ int main(int argc, char *argv[])
 	return 0;
 }
 
-int serial_open(char *serial_name)
+int serial_open()
 {
 	int fd;
 	
@@ -112,13 +125,13 @@ void sigint_handler(int sign)
 	signal(SIGINT, SIG_DFL);
 }
 
-void get_conf(char *file_name)
+void get_conf()
 {
 	FILE *file = NULL;
 	char line[50];
 
-	if ((file = fopen(file_name, "r")) == NULL)
-		error(EXIT_FAILURE, errno, "Cannot open config file %s", file_name);
+	if ((file = fopen(conf_file_name, "r")) == NULL)
+		error(EXIT_FAILURE, errno, "Cannot open config file %s", conf_file_name);
 	
 	while(fgets(line, 50, file) != NULL) {
 		if (line[0] != '\n')
@@ -126,9 +139,9 @@ void get_conf(char *file_name)
 	}
 
 	if (fclose(file) == EOF)
-		error(0, errno, "ERROR: Cannot close config file %s", file_name);
+		error(0, errno, "ERROR: Cannot close config file %s", conf_file_name);
 }
-
+/*
 void tcp_server(void)
 {
 	int s_sockfd;
@@ -172,4 +185,4 @@ void tcp_client(void)
 	connect(s_sockfd, (struct sockaddr_in *)&s_addr, sizeof(struct sockaddr_in);
 	
 	close(s_sockfd);
-}
+}*/
