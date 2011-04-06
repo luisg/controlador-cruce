@@ -21,29 +21,30 @@ char *tcp_server = "127.0.0.1";
 char *server_port = "2000";
 char *conf_file_name = "conf";
 
+int time_flag = 0;
+int cicle_time = 5;
+
 struct termios oldsioc, newsioc;
 
 int serial_open();
 int serial_close(int fd);
 void get_conf();
 void sigint_handler(int sign);
+void sigalrm_handler(int sign);
 
 int main(int argc, char *argv[])
 {
 	int tmp;
 	int s_fd;
 	int sockfd;
+	int car_count = 0;
+	char serial_buf[256];
+	char cad_count[10];
+	char cad_cicle[10];
+	char msg[256];
+	char buf[256];
 	struct sockaddr_in s_addr;
 		
-	if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1)
-		error(EXIT_FAILURE, errno, "Cannot open socket");
-	
-	s_addr.sin_family = AF_INET;
-	s_addr.sin_port = htons(server_port);
-	s_addr.sin_addr.s_addr = inet_addr(tcp_server);
-	memset(&s_addr, 0, sizeof(s_addr));
-	
-
 	/*	
 	if (argc < 5) { 
 		PRINT_HELP
@@ -75,7 +76,52 @@ int main(int argc, char *argv[])
 	if (signal(SIGINT, sigint_handler) == SIG_ERR)
   		error(0, errno, "ERROR: Cannot set signal handler");
 
+	if (signal(SIGALRM, sigalrm_handler) == SIG_ERR)
+		error(EXIT_FAILURE, errno, "ERROR: Cannot set alarm signal handler");
+	
+	s_fd = serial_open();
 		
+	
+	memset(&s_addr, 0, sizeof(s_addr));
+	s_addr.sin_family = AF_INET;
+	s_addr.sin_port = htons(2000);
+	s_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+	
+	alarm(cicle_time);
+
+	while(1) {
+		msg[0] = '\0';
+		car_count = 0;
+		time_flag = 0;
+		while(!time_flag) {
+			tmp = read(s_fd, serial_buf, sizeof(serial_buf));
+			serial_buf[tmp] = '\0';
+			printf("%s", serial_buf);
+			car_count++;
+		}		
+		sprintf(cad_count, "%d", car_count);
+		sprintf(cad_cicle, "%d", cicle_time);
+		strcat(msg, "%1&");
+		strcat(msg, cad_count);
+		strcat(msg, "#");
+		printf("sending: %s\n", msg);
+		
+		if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1)
+			error(EXIT_FAILURE, errno, "Cannot open socket");
+		
+		if (connect(sockfd, (struct sockaddr *)&s_addr, sizeof(s_addr)) == -1)
+			error(0, errno, "ERROR: Cannot connect to te server");
+		
+		if (send(sockfd, msg, strlen(msg)+1, 0) < 0)
+			error(0, errno, "ERROR: sending");
+		
+		recv(sockfd, buf, sizeof(buf), 0);
+		printf("recv: %s\n", buf);
+		
+		close(sockfd);
+		alarm(cicle_time);
+	}	
+	
 	return 0;
 }
 
@@ -123,6 +169,12 @@ void sigint_handler(int sign)
 {
 	printf("\nQuit? Try again\n");
 	signal(SIGINT, SIG_DFL);
+}
+
+void sigalrm_handler(int sign)
+{
+	time_flag = 1;
+	signal(sign, sigalrm_handler);
 }
 
 void get_conf()

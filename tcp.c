@@ -54,10 +54,10 @@ int tcp_server()
 	while(1) {
 		sin_size = sizeof(client_addr);
 		client_sockfd = accept(sockfd, (struct sockaddr *)&client_addr, &sin_size);
-		
 		recv(client_sockfd, buf, sizeof(buf), 0);
 		printf("recv: %s from %s\n", buf, inet_ntoa(client_addr.sin_addr));
 		
+		send(client_sockfd, buf, sizeof(buf), 0);	
 		close(client_sockfd);	
 	}
 	
