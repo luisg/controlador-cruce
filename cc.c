@@ -84,8 +84,8 @@ int main(int argc, char *argv[])
 	
 	memset(&s_addr, 0, sizeof(s_addr));
 	s_addr.sin_family = AF_INET;
-	s_addr.sin_port = htons(2000);
-	s_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+	s_addr.sin_port = htons(atoi(server_port));
+	s_addr.sin_addr.s_addr = inet_addr(tcp_server);
 	
 	alarm(cicle_time);
 
@@ -106,7 +106,7 @@ int main(int argc, char *argv[])
 		strcat(msg, "#");
 		printf("sending: %s\n", msg);
 		
-		if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1)
+		if ((sockfd = socket(PF_INET, SOCK_STREAM, 0)) == -1)
 			error(EXIT_FAILURE, errno, "Cannot open socket");
 		
 		if (connect(sockfd, (struct sockaddr *)&s_addr, sizeof(s_addr)) == -1)
@@ -193,48 +193,3 @@ void get_conf()
 	if (fclose(file) == EOF)
 		error(0, errno, "ERROR: Cannot close config file %s", conf_file_name);
 }
-/*
-void tcp_server(void)
-{
-	int s_sockfd;
-	int c_sockfd;
-	socklen_t sin_size;
-	struct sockaddr_in s_addr;
-	struct sockaddr_in c_addr;
-	
-	s_sockfd = socket(PF_INET, SOCK_STREAM, 0);
-	
-	memset(&s_addr, 0, sizeof(struct sockaddr_in);
-	
-	s_addr.sin_family = AF_INET;
-	s_addr.sin_port = htons(2000);
-	s_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-	
-	bind(s_sockfd, (struct sockaddr *)&s_addr, sizeof(struct sockaddr));
-	listen(s_sockfd, 1);
-	
-	sin_size = sizeof(struct sockaddr_in);
-	c_sockfd = accept(s_sockfd, (struct sockaddr *)&c_addr, &sin_size);
-	
-	close(c_sockfd);
-	close(s_sockfd);
-	
-}
-
-void tcp_client(void)
-{
-	int s_sockfd;
-	struct sockaddr_in s_addr;
-	
-	s_sockfd = socket(PF_INET, SOCK_STREAM, 0);
-	
-	memset(&s_addr, 0, sizeof(sockaddr_in));
-	
-	s_addr.sin_family = AF_INET;
-	s_addr.sin_port = htons(2000);
-	s_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
-	
-	connect(s_sockfd, (struct sockaddr_in *)&s_addr, sizeof(struct sockaddr_in);
-	
-	close(s_sockfd);
-}*/
