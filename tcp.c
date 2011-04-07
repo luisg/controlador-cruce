@@ -12,6 +12,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <stdint.h>
 
 int tcp_client(char *msg);
 int tcp_server();
@@ -33,7 +34,9 @@ int tcp_server()
 	int sockfd;
 	int client_sockfd;
 	int recv_bytes;
-	char recv_buf[256];
+	int i;
+	char recv_buf[1024];
+
 	socklen_t sin_size;
 	struct sockaddr_in myaddr;
 	struct sockaddr_in client_addr;
@@ -58,19 +61,25 @@ int tcp_server()
 	
 	while(1) {
 		sin_size = sizeof(client_addr);
-		if ((client_sockfd = accept(sockfd, (struct sockaddr *)&client_addr, &sin_size) == -1));
+		client_sockfd = accept(sockfd, (struct sockaddr *)&client_addr, &sin_size);
+		if (client_sockfd == -1)
 			error(0, errno, "ERROR: Cannot get new connection");
 		
-		if ((recv_bytes = recv(client_sockfd, recv_buf, sizeof(recv_buf), 0) == 0)) {
+		recv_bytes = recv(client_sockfd, &recv_buf, sizeof recv_buf, 0);
+		if (recv_bytes == 0) {
 			printf("Connection closed by client\n");
 			continue;
 		}
 		else if (recv_bytes == -1)
 			error(EXIT_FAILURE, errno, "ERROR: reciving data");
 		
-		printf("recv: %s from %s\n", recv_buf, inet_ntoa(client_addr.sin_addr));
+		printf("recv %d bytes from: %s\n", recv_bytes, inet_ntoa(client_addr.sin_addr));
+		printf("data: ");
 		
-		send(client_sockfd, buf, sizeof(buf), 0);	
+		for (i = 0; i < recv_bytes; ++i) {
+			printf("%d ", recv_buf[i]); 
+		}
+		printf("\n");
 		close(client_sockfd);	
 	}
 	
@@ -80,21 +89,23 @@ int tcp_server()
 int tcp_client(char *msg)
 {	
 	int sockfd;
+	int num = 10;
 	struct sockaddr_in raddr;
 	
 	memset(&raddr, 0, sizeof(raddr));
 	
-	if ((sockfd = socket(PF_INET, SOCK_STREAM, 0) == -1))
+	if ((sockfd = socket(PF_INET, SOCK_STREAM, 0)) == -1)
 		error(EXIT_FAILURE, errno, "ERROR: Cannot open socket");
 	
 	raddr.sin_family = AF_INET;
 	raddr.sin_port = htons(2000);
 	raddr.sin_addr.s_addr = inet_addr("127.0.0.1");
 	
-	if (connect(sockfd, (struct sockaddr *)&raddr, sizeof(raddr)) == -1)
+	if ((connect(sockfd, (struct sockaddr *)&raddr, sizeof raddr)) == -1)
 		error(EXIT_FAILURE, errno, "ERROR: Cannot connect to remote server");
 	
-	send(sockfd, msg, strlen(msg) + 1, 0);
+	if (send(sockfd, msg, sizeof(msg), 0) == -1)
+		error(EXIT_FAILURE, errno, "ERROR: Cannot send message to remote host");
 	
 	close(sockfd);
 	

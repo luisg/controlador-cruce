@@ -18,11 +18,24 @@ Uso: cc -n <serial> -s <servidor> \
 
 char *serial_name = "/dev/ttyS0";
 char *tcp_server = "127.0.0.1";
-char *server_port = "2000";
+char *tcp_port = "2000";
 char *conf_file_name = "conf";
 
 int time_flag = 0;
 int cicle_time = 5;
+
+struct s_sem {
+	uint8_t id_sem;
+	uint8_t green_time;
+	uint8_t car_count;
+};
+
+struct s_mesg {
+	uint8_t id_cruce;
+	uint8_t num_sem;
+	uint8_t cicle_time_s;
+	struct s_sem sem[4];
+};
 
 struct termios oldsioc, newsioc;
 
@@ -31,20 +44,17 @@ int serial_close(int fd);
 void get_conf();
 void sigint_handler(int sign);
 void sigalrm_handler(int sign);
+int tcp_sendmsg(struct s_mesg *msg);
 
 int main(int argc, char *argv[])
 {
 	int tmp;
 	int s_fd;
-	int sockfd;
 	int car_count = 0;
 	char serial_buf[256];
-	char cad_count[10];
-	char cad_cicle[10];
-	char msg[256];
-	char buf[256];
-	struct sockaddr_in s_addr;
-		
+	
+	struct s_mesg msg;
+	
 	/*	
 	if (argc < 5) { 
 		PRINT_HELP
@@ -61,7 +71,7 @@ int main(int argc, char *argv[])
 				tcp_server = optarg;
 				break;
 			case 'p':
-				server_port = optarg;
+				tcp_port = optarg;
 				break;
 			case 'c':
 				conf_file_name = optarg;
@@ -79,49 +89,48 @@ int main(int argc, char *argv[])
 	if (signal(SIGALRM, sigalrm_handler) == SIG_ERR)
 		error(EXIT_FAILURE, errno, "ERROR: Cannot set alarm signal handler");
 	
-	s_fd = serial_open();
-		
+	msg.id_cruce = 111;
+	msg.num_sem = 4;
+	msg.cicle_time_s = 90;
+	msg.sem[0].id_sem = 0;
+	msg.sem[0].green_time = 15;
+	msg.sem[0].car_count = 22;
+	msg.sem[1].id_sem = 1;
+	msg.sem[1].green_time = 40;
+	msg.sem[1].car_count = 31;
+	msg.sem[2].id_sem = 2;
+	msg.sem[2].green_time = 8;
+	msg.sem[2].car_count = 2;
+	msg.sem[3].id_sem = 3;
+	msg.sem[3].green_time = 25;
+	msg.sem[3].car_count = 5;
 	
-	memset(&s_addr, 0, sizeof(s_addr));
-	s_addr.sin_family = AF_INET;
-	s_addr.sin_port = htons(atoi(server_port));
-	s_addr.sin_addr.s_addr = inet_addr(tcp_server);
+	printf("sending: \n");
+	if (tcp_sendmsg(&msg) < 0)
+		perror("tcp_sendmsg");
 	
+	/*
+	s_fd = serial_open();	
 	alarm(cicle_time);
-
+	
 	while(1) {
 		msg[0] = '\0';
 		car_count = 0;
 		time_flag = 0;
+		
 		while(!time_flag) {
 			tmp = read(s_fd, serial_buf, sizeof(serial_buf));
 			serial_buf[tmp] = '\0';
 			printf("%s", serial_buf);
 			car_count++;
-		}		
-		sprintf(cad_count, "%d", car_count);
-		sprintf(cad_cicle, "%d", cicle_time);
-		strcat(msg, "%1&");
-		strcat(msg, cad_count);
-		strcat(msg, "#");
-		printf("sending: %s\n", msg);
+		}	
+			
+		tcp_sendmsg(struct mesg);
 		
-		if ((sockfd = socket(PF_INET, SOCK_STREAM, 0)) == -1)
-			error(EXIT_FAILURE, errno, "Cannot open socket");
-		
-		if (connect(sockfd, (struct sockaddr *)&s_addr, sizeof(s_addr)) == -1)
-			error(0, errno, "ERROR: Cannot connect to te server");
-		
-		if (send(sockfd, msg, strlen(msg)+1, 0) < 0)
-			error(0, errno, "ERROR: sending");
-		
-		recv(sockfd, buf, sizeof(buf), 0);
-		printf("recv: %s\n", buf);
-		
-		close(sockfd);
 		alarm(cicle_time);
 	}	
-	
+	*/
+		
 	return 0;
 }
 
@@ -192,4 +201,37 @@ void get_conf()
 
 	if (fclose(file) == EOF)
 		error(0, errno, "ERROR: Cannot close config file %s", conf_file_name);
+}
+
+int tcp_sendmsg(struct s_mesg *msg)
+{
+	int sockfd;
+	int len;
+
+	struct sockaddr_in s_addr;
+	
+	if ((sockfd = socket(PF_INET, SOCK_STREAM, 0)) < 0) {
+		perror("socket");
+		return -1;
+	}
+	
+	memset(&s_addr, 0, sizeof(s_addr));
+	s_addr.sin_family = AF_INET;
+	s_addr.sin_port = htons(((short)atoi(tcp_port)));
+	s_addr.sin_addr.s_addr = inet_addr(tcp_server);
+	
+	if (connect(sockfd, (struct sockaddr *)&s_addr, sizeof(s_addr)) < 0) {
+		perror("connect");
+		return -1;
+	}
+	
+	if ((len = send(sockfd, msg, sizeof(*msg), 0)) < 0) {
+		perror("send");
+		return -1;
+	}
+	
+	/* recibir mensaje del servidor */
+	
+	close(sockfd);
+	return 0;
 }
