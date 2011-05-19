@@ -14,6 +14,19 @@
 #include <arpa/inet.h>
 #include <stdint.h>
 
+struct s_sem {
+	uint8_t id_sem;
+	uint8_t green_time;
+	uint8_t car_count;
+};
+
+struct s_mesg {
+	uint8_t id_cruce;
+	uint8_t num_sem;
+	uint8_t cicle_time_s;
+	struct s_sem sem[2];
+};
+
 int tcp_client(char *msg);
 int tcp_server();
 
@@ -36,6 +49,8 @@ int tcp_server()
 	int recv_bytes;
 	int i;
 	char recv_buf[1024];
+	
+	struct s_mesg msg;
 
 	socklen_t sin_size;
 	struct sockaddr_in myaddr;
@@ -74,11 +89,11 @@ int tcp_server()
 			error(EXIT_FAILURE, errno, "ERROR: reciving data");
 		
 		printf("recv %d bytes from: %s\n", recv_bytes, inet_ntoa(client_addr.sin_addr));
-		printf("data: ");
-		
-		for (i = 0; i < recv_bytes; ++i) {
-			printf("%d ", recv_buf[i]); 
-		}
+		printf("data: %s", recv_buf);
+				
+		if (send(client_sockfd, "Ok!", 4, 0) == -1)
+			error(EXIT_FAILURE, errno, "ERROR: Cannot send message to remote host");
+
 		printf("\n");
 		close(client_sockfd);	
 	}
@@ -88,8 +103,16 @@ int tcp_server()
 
 int tcp_client(char *msg)
 {	
+	int msglen = strlen(msg);
+	
+	msg[msglen+2] = '\0';
+	msg[msglen] = '\r';
+	msg[msglen+1] = '\n';
+
 	int sockfd;
 	int num = 10;
+	int recv_bytes;
+	char recv_buf[256];
 	struct sockaddr_in raddr;
 	
 	memset(&raddr, 0, sizeof(raddr));
@@ -99,14 +122,24 @@ int tcp_client(char *msg)
 	
 	raddr.sin_family = AF_INET;
 	raddr.sin_port = htons(2000);
-	raddr.sin_addr.s_addr = inet_addr("127.0.0.1");
+	raddr.sin_addr.s_addr = inet_addr("148.213.39.199");
 	
 	if ((connect(sockfd, (struct sockaddr *)&raddr, sizeof raddr)) == -1)
 		error(EXIT_FAILURE, errno, "ERROR: Cannot connect to remote server");
 	
-	if (send(sockfd, msg, sizeof(msg), 0) == -1)
+	if (send(sockfd, msg, strlen(msg), 0) == -1)
 		error(EXIT_FAILURE, errno, "ERROR: Cannot send message to remote host");
 	
+	recv_bytes = recv(sockfd, &recv_buf, sizeof recv_buf, 0);
+	if (recv_bytes == 0) {
+		printf("Connection closed by client\n");
+		exit(-1);
+	}
+	else if (recv_bytes == -1)
+		error(EXIT_FAILURE, errno, "ERROR: reciving data");
+	
+	printf("Data Recibida: %s\n", recv_buf);
+		
 	close(sockfd);
 	
 	return 0;
