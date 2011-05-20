@@ -11,37 +11,62 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <pthread.h>
 
 #define PRINT_HELP printf("CC Controlador de Cruce\n\
 Uso: cc -n <serial> -s <servidor> \
 -p <puerto servidor> -c <archivo configuracion>\n");
 
+#define GREEN 0
+#define RED 1
+#define YELLOW 2
+
+struct semaforo {
+	int id_sem;
+	int green_time;
+	int red_time;
+	int counter;
+	int status;
+};
+
+struct cruce {
+	int cicle_time;
+	int n_sem;
+	int id_cruce;
+	int yellow_time;
+	struct semaforo sems[4];
+};
+
 char *serial_name = "/dev/ttyS0";
 char *tcp_server = "127.0.0.1";
 unsigned short tcp_port = 2000;
 char *conf_file_name = "conf";
-int id_cruce = 0;
 
-int time_flag = 0;
-int cicle_time = 60;
+int cicle_counter = 0;
 
 struct termios oldsioc, newsioc;
+struct cruce cr;
 
 int serial_open();
 int serial_close(int fd);
+
 void get_conf();
+
 void sigint_handler(int sign);
 void sigalrm_handler(int sign);
-int tcp_sendmsg(struct s_mesg *msg);
+
+int tcp_sendmsg(char *msg, char *recvmsg);
+
+void doit(void);
+void reconfigure(char *conf_cr);
+void print_info(void);
 
 int main(int argc, char *argv[])
 {
 	int tmp;
 	int s_fd;
-	int car_count = 0;
 	char serial_buf[256];
 	
-	struct s_mesg msg;
 	/*	
 	if (argc < 5) { 
 		PRINT_HELP
@@ -77,33 +102,20 @@ int main(int argc, char *argv[])
 
 	if (signal(SIGALRM, sigalrm_handler) == SIG_ERR)
 		error(EXIT_FAILURE, errno, "ERROR: Cannot set alarm signal handler");
-	/*
-	printf("sending: \n");
-	if (tcp_sendmsg(&msg) < 0)
-		perror("tcp_sendmsg");
 	
+	cr.n_sem = 4;
+	cr.id_cruce = 1;
+	cr.yellow_time = 2;
 	
-	s_fd = serial_open();	
-	alarm(cicle_time);
+	reconfigure("10&10&10&10");
 	
-	while(1) {
-		msg[0] = '\0';
-		car_count = 0;
-		time_flag = 0;
-		
-		while(!time_flag) {
-			tmp = read(s_fd, serial_buf, sizeof(serial_buf));
-			serial_buf[tmp] = '\0';
-			printf("%s", serial_buf);
-			car_count++;
-		}	
-			
-		tcp_sendmsg(struct mesg);
-		
-		alarm(cicle_time);
-	}	
-	*/
-		
+	alarm(1);
+	
+	//s_fd = serial_open();	
+	while(1){
+		;
+	}
+	
 	return 0;
 }
 
@@ -155,8 +167,9 @@ void sigint_handler(int sign)
 
 void sigalrm_handler(int sign)
 {
-	time_flag = 1;
+	doit();
 	signal(sign, sigalrm_handler);
+	alarm(1);
 }
 
 void get_conf()
@@ -176,11 +189,13 @@ void get_conf()
 		error(0, errno, "ERROR: Cannot close config file %s", conf_file_name);
 }
 
-int tcp_sendmsg(struct s_mesg *msg)
+int tcp_sendmsg(char *msg, char *recvmsg)
 {
 	int sockfd;
 	int len;
-
+	int recv_bytes;
+	char recv_buf[256];
+	
 	struct sockaddr_in s_addr;
 	
 	if ((sockfd = socket(PF_INET, SOCK_STREAM, 0)) < 0) {
@@ -203,8 +218,112 @@ int tcp_sendmsg(struct s_mesg *msg)
 		return -1;
 	}
 	
-	/* recibir mensaje del servidor */
+	recv_bytes = recv(sockfd, &recv_buf, sizeof recv_buf, 0);
+	if (recv_bytes == 0) {
+		printf("Connection closed by client\n");
+		exit(-1);
+	} else if (recv_bytes == -1)
+		perror("recv");
+	
+	recvmsg = (char*)malloc(recv_bytes);
 	
 	close(sockfd);
 	return 0;
+}
+
+void doit(void)
+{
+	int i = 0;
+	
+	if (cicle_counter == 0) {
+		reconfigure("10&10&10&10");
+		//cicle_counter = cr.cicle_time;
+	} else {
+		cicle_counter--;
+		for (i = 0; i < cr.n_sem; ++i) {
+			if (cr.sems[i].counter == 0) {
+				switch(cr.sems[i].status) {
+					case GREEN:
+						cr.sems[i].status = YELLOW;
+						cr.sems[i].counter = cr.yellow_time;
+						break;
+					case YELLOW:
+						cr.sems[i].status = RED;
+						cr.sems[i].counter = -1;
+						break;
+					case RED:
+						cr.sems[i].status = GREEN;
+						cr.sems[i].counter = cr.sems[i].green_time;
+						break;
+				}
+			}
+			if (cr.sems[i].counter != -1)
+				cr.sems[i].counter--;
+		}
+	}
+	
+	print_info();
+}	
+
+void reconfigure(char *conf_cr) 
+{
+	int i = 1;
+	int rt = 0;
+	char *tmp_conf;
+	char *cad;
+
+	tmp_conf = malloc(sizeof(*conf_cr));
+	strcpy(tmp_conf, conf_cr);
+	printf("%s\n", tmp_conf);
+	
+	cad = strtok(tmp_conf, "&");
+	rt = (cr.sems[0].green_time = atoi(cad)) + cr.yellow_time;
+	
+	while ((cad = strtok(NULL, "&")) != NULL){
+		cr.sems[i].red_time = rt;
+		rt += (cr.sems[i++].green_time = atoi(cad)) + cr.yellow_time;
+	}
+	
+	cr.sems[0].red_time = rt;
+	cr.sems[0].status = GREEN;
+	cr.sems[0].counter = cr.sems[0].green_time;
+	
+	for (i = 1; i < cr.n_sem; ++i) {
+		cr.sems[i].status = RED;
+		cr.sems[i].counter = cr.sems[i].red_time;
+	}	
+	/*Calcula el tiempo de Ciclo (tiempos en verde + tiempos en amarillo)*/
+	cr.cicle_time = 0;
+	for (i = 0; i < cr.n_sem; ++i) {
+		cr.cicle_time += cr.sems[i].green_time;
+	}
+	
+	cr.cicle_time += (cr.yellow_time * cr.n_sem);
+	cicle_counter = cr.cicle_time;
+}
+
+void print_info(void)
+{
+	int i;
+	
+	system("clear");
+	printf("Tiempo de Ciclo = %d\n", cicle_counter);
+	printf("  S0     S1      S2     S3 \n");
+	
+	for (i = 0; i < cr.n_sem; i++) {	
+		switch (cr.sems[i].status) {
+			case GREEN:
+				printf("V : ");
+				break;
+			case RED: 
+				printf("R : ");
+				break;
+			case YELLOW:
+				printf("A : ");
+				break;
+		}
+		printf("%d    ", cr.sems[i].counter);
+	}
+	
+	printf("\n\n");
 }
