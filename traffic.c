@@ -33,27 +33,15 @@ void doit(void);
 void reconfigure(char *conf_cr);
 void print_info(void);
 
-int main(int argc, char *argv[])
+int main(int argc, char *argv[])c
 {	
 	int i = 0;
 	
 	cr.n_sem = 4;
 	cr.id_cruce = 1;
 	cr.yellow_time = 2;
-	
+
 	reconfigure("10&10&10&10");
-	
-	cr.sems[0].id_sem = 1;
-	cr.sems[0].status = GREEN;
-	cr.sems[0].counter = cr.sems[i].green_time;
-	
-	for (i = 1; i < cr.n_sem; ++i) {
-		cr.sems[i].id_sem = i;
-		cr.sems[i].status = RED;
-		cr.sems[i].counter = cr.sems[i].red_time;
-	}
-	
-	
 	
 	if (signal(SIGALRM, sigalrm_handler) == SIG_ERR)
 		printf("ERROR: Cannot set alarm signal handler\n");
@@ -79,7 +67,8 @@ void doit(void)
 	int i = 0;
 	
 	if (cicle_counter == 0) {
-		cicle_counter = cr.cicle_time;
+		reconfigure("10&10&10&10");
+		//cicle_counter = cr.cicle_time;
 	} else {
 		cicle_counter--;
 		for (i = 0; i < cr.n_sem; ++i) {
@@ -91,7 +80,7 @@ void doit(void)
 						break;
 					case YELLOW:
 						cr.sems[i].status = RED;
-						cr.sems[i].counter = cr.sems[i].red_time;
+						cr.sems[i].counter = -1;
 						break;
 					case RED:
 						cr.sems[i].status = GREEN;
@@ -99,7 +88,8 @@ void doit(void)
 						break;
 				}
 			}
-			cr.sems[i].counter--;
+			if (cr.sems[i].counter != -1)
+				cr.sems[i].counter--;
 		}
 	}
 	
@@ -126,15 +116,13 @@ void reconfigure(char *conf_cr)
 	}
 	
 	cr.sems[0].red_time = rt;
+	cr.sems[0].status = GREEN;
+	cr.sems[0].counter = cr.sems[0].green_time;
 	
-	/*
-	cr.sems[1].id_sem = 1;
-	cr.sems[1].green_time = 10;
-	cr.sems[1].red_time = 12;
-	cr.sems[1].status = RED;
-	cr.sems[1].counter = cr.sems[1].red_time;
-	*/	
-	
+	for (i = 1; i < cr.n_sem; ++i) {
+		cr.sems[i].status = RED;
+		cr.sems[i].counter = cr.sems[i].red_time;
+	}	
 	/*Calcula el tiempo de Ciclo (tiempos en verde + tiempos en amarillo)*/
 	cr.cicle_time = 0;
 	for (i = 0; i < cr.n_sem; ++i) {
