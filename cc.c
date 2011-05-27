@@ -27,6 +27,7 @@ struct semaforo {
 	int red_time;
 	int counter;
 	int status;
+	int n_car;
 };
 
 struct cruce {
@@ -38,11 +39,14 @@ struct cruce {
 };
 
 char *serial_name = "/dev/ttyS0";
-char *tcp_server = "127.0.0.1";
+char *tcp_server = "148.213.39.199";
 unsigned short tcp_port = 2000;
 char *conf_file_name = "conf";
 
 int cicle_counter = 0;
+int recv_flag = 0;
+char msg[64] = "4&24&30&4&17&70";
+char conf[64] = "3&4&5&6";
 
 struct termios oldsioc, newsioc;
 struct cruce cr;
@@ -55,11 +59,12 @@ void get_conf();
 void sigint_handler(int sign);
 void sigalrm_handler(int sign);
 
-int tcp_sendmsg(char *msg, char *recvmsg);
+int tcp_sendmsg();
 
 void doit(void);
 void reconfigure(char *conf_cr);
 void print_info(void);
+void *tcp_thread(void *parms);
 
 int main(int argc, char *argv[])
 {
@@ -107,10 +112,9 @@ int main(int argc, char *argv[])
 	cr.id_cruce = 1;
 	cr.yellow_time = 2;
 	
-	reconfigure("10&10&10&10");
+	reconfigure(conf);
 	
 	alarm(1);
-	
 	//s_fd = serial_open();	
 	while(1){
 		;
@@ -189,7 +193,7 @@ void get_conf()
 		error(0, errno, "ERROR: Cannot close config file %s", conf_file_name);
 }
 
-int tcp_sendmsg(char *msg, char *recvmsg)
+int tcp_sendmsg()
 {
 	int sockfd;
 	int len;
@@ -213,19 +217,17 @@ int tcp_sendmsg(char *msg, char *recvmsg)
 		return -1;
 	}
 	
-	if ((len = send(sockfd, msg, sizeof(*msg), 0)) < 0) {
+	if ((len = send(sockfd, msg, sizeof(msg), 0)) < 0) {
 		perror("send");
 		return -1;
 	}
 	
-	recv_bytes = recv(sockfd, &recv_buf, sizeof recv_buf, 0);
+	recv_bytes = recv(sockfd, &conf, sizeof conf, 0);
 	if (recv_bytes == 0) {
 		printf("Connection closed by client\n");
 		exit(-1);
 	} else if (recv_bytes == -1)
 		perror("recv");
-	
-	recvmsg = (char*)malloc(recv_bytes);
 	
 	close(sockfd);
 	return 0;
@@ -234,9 +236,12 @@ int tcp_sendmsg(char *msg, char *recvmsg)
 void doit(void)
 {
 	int i = 0;
+	int tmp;
+	pthread_t idTh;
 	
 	if (cicle_counter == 0) {
-		reconfigure("10&10&10&10");
+		pthread_create(&idTh, NULL, tcp_thread, NULL);
+		reconfigure(conf);
 		//cicle_counter = cr.cicle_time;
 	} else {
 		cicle_counter--;
@@ -326,4 +331,8 @@ void print_info(void)
 	}
 	
 	printf("\n\n");
+}
+
+void *tcp_thread(void *parms) {
+	tcp_sendmsg();
 }
